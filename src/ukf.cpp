@@ -68,7 +68,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
     // Process Lidar
     if (! is_initialized_) {
-      // TODO: Initialize mean and covariance
+      // Initialize mean and covariance
+      x_(0) = meas_package.raw_measurements_(0);
+      x_(1) = meas_package.raw_measurements_(1);
+      P_(0, 0) = R_laser_(0, 0);
+      P_(1, 1) = R_laser_(1, 1);
       time_us_ = meas_package.timestamp_;
       is_initialized_ = true;
       return;
