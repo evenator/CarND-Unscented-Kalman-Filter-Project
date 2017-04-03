@@ -168,6 +168,7 @@ void UKF::Predict(double dt) {
   P_ = MatrixXd::Zero(n_x_, n_x_);
   for (int i = 0; i < Xsig_pred_.cols(); ++i) {
     VectorXd d = Xsig_pred_.col(i) - x_;
+    d(3) = atan2(sin(d(3)), cos(d(3)));
     P_ += weights_(i) * d * d.transpose();
   }
   
