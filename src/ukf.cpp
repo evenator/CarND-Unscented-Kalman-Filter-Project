@@ -258,23 +258,22 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   VectorXd z_pred = Zsig * weights_;
   z_pred(1) = atan2(sin(z_pred(1)), cos(z_pred(1)));
   
-  // Calculate Measurement Covariance Matrix S
+  // Calculate Measurement Covariance Matrix S and Cross Correlation Matrix Tc
   MatrixXd S = MatrixXd::Zero(n_z, n_z);
+  MatrixXd Tc = MatrixXd::Zero(n_x_, n_z);
   for (int i = 0; i < Zsig.cols(); ++i)
   {
       VectorXd dZ = Zsig.col(i) - z_pred;
+      dZ(1) = atan2(sin(dZ(1)), cos(dZ(1)));
       S += weights_(i) * dZ * dZ.transpose();
+
+      VectorXd dX = Xsig_pred_.col(i) - x_;
+      dX(3) = atan2(sin(dX(3)), cos(dX(3)));
+      Tc += weights_(i) * dX * (dZ).transpose();
   }
-  S(0,0) += std_radr_ * std_radr_;
+  S(0, 0) += std_radr_ * std_radr_;
   S(1, 1) += std_radphi_ * std_radphi_;
   S(2, 2) += std_radrd_ * std_radrd_;
-  
-  // Calculate Cross Correlation Matrix Tc
-  MatrixXd Tc = MatrixXd::Zero(n_x_, n_z);
-  for (int i = 0; i < weights_.size(); ++i)
-  {
-      Tc += weights_(i) * (Xsig_pred_.col(i) - x_) * (Zsig.col(i) - z_pred).transpose();
-  }
 
   // Calculate Kalman Gain K;
   MatrixXd S_inv = S.inverse();
