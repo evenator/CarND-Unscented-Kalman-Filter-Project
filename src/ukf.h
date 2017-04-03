@@ -94,6 +94,15 @@ public:
    * @param meas_package The latest measurement data of either radar or laser
    */
   void ProcessMeasurement(MeasurementPackage meas_package);
+  
+  /**
+   * The linearized (Jacobian) H-inverse matrix for the radar, as a function
+   * of the measuremento, used for the initialization of the P matrix
+   * 
+   * @param z_meaurement The measurement vector to convert to state space
+   * @return The H-inverse matrix
+   */
+   MatrixXd HInvjRadar(const Eigen::VectorXd &z_measurement);
 
   /**
    * Prediction Predicts sigma points, the state, and the state covariance

@@ -87,7 +87,21 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   else {
     // Process Radar
     if (! is_initialized_) {
-      // TODO: Initialize mean and covariance
+      // Initialize mean
+      const double& rho = meas_package.raw_measurements_(0);
+      const double& phi = meas_package.raw_measurements_(1);
+      const double& rho_dot = meas_package.raw_measurements_(2);
+      x_(0) = rho * cos(phi);
+      x_(1) = rho * sin(phi);
+      x_(2) = rho_dot;
+      // Initialize covariance using Jacobian
+      const int n_z = meas_package.raw_measurements_.size();
+      MatrixXd R_radar_ = MatrixXd::Zero(n_z, n_z);
+      R_radar_(0, 0) = std_radr_ * std_radr_;
+      R_radar_(1, 1) = std_radphi_ * std_radphi_;
+      R_radar_(2, 2) = std_radrd_ * std_radrd_;
+      MatrixXd H_inv = HInvjRadar(meas_package.raw_measurements_);
+      P_.topLeftCorner(3, 3) = (H_inv * R_radar_ * H_inv.transpose()).topLeftCorner(3, 3);
       time_us_ = meas_package.timestamp_;
       is_initialized_ = true;
       return;
@@ -101,12 +115,19 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       time_us_ = meas_package.timestamp_;
     }
   }
-  /**
-  TODO:
+}
 
-  Complete this function! Make sure you switch between lidar and radar
-  measurements.
-  */
+MatrixXd UKF::HInvjRadar(const Eigen::VectorXd &z_measurement) {
+  double r = z_measurement(0);
+  double phi = z_measurement(1);
+  double r_dot = z_measurement(2);
+  double s = sin(phi);
+  double c = sin(phi);
+  return (MatrixXd(5,3) << c, -r * s, 0,
+                           s, r * c, 0,
+                           0, 0, 1,
+                           0, 1, 0,
+                           0, 0, 0).finished();
 }
 
 /**
@@ -141,7 +162,7 @@ void UKF::Predict(double dt) {
     const double& nu_a_k = Xsig_aug(5, i);
     const double& nu_psi_ddot_k = Xsig_aug(6, i);
     Xsig_pred_.col(i) = Xsig_aug.col(i);
-    if (psi_dot_k == 0) {
+    if (abs(psi_dot_k) < .000001) {
       Xsig_pred_(0, i) += (vk + .5 * dt * nu_a_k) * cos(psi_k) * dt;
       Xsig_pred_(1, i) += (vk + .5 * dt * nu_a_k) * sin(psi_k) * dt;
       Xsig_pred_(2, i) += dt * nu_a_k;
