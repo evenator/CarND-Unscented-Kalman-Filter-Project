@@ -78,7 +78,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       return;
     }
     else if (use_laser_) {
-      double dt = (meas_package.timestamp_ - time_us_) / 1000000.0;
+      double dt = static_cast<double>(meas_package.timestamp_ - time_us_) / 1000000.0;
       Predict(dt);
       UpdateLidar(meas_package);
       time_us_ = meas_package.timestamp_;
@@ -109,7 +109,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     else if (use_radar_)
     {
       // Perform filter prediction/update from radar
-      double dt = (meas_package.timestamp_ - time_us_) / 1000000.0;
+      double dt = static_cast<double>(meas_package.timestamp_ - time_us_) / 1000000.0;
       Predict(dt);
       UpdateRadar(meas_package);
       time_us_ = meas_package.timestamp_;
@@ -139,6 +139,7 @@ MatrixXd UKF::HInvjRadar(const Eigen::VectorXd &z_measurement) {
 void UKF::Predict(double dt) {
   assert(x_.allFinite());
   assert(P_.allFinite());
+  assert(dt >= 0);
   // P Matrix must be positive semi-definite
   assert(P_.llt().info() != Eigen::NumericalIssue);
 
@@ -163,6 +164,12 @@ void UKF::Predict(double dt) {
   Xsig_aug.block(0, 1, n_aug_, n_aug_) += A;
   Xsig_aug.rightCols(n_aug_) -= A;
   assert(Xsig_aug.allFinite());
+
+  // If dt is ~0, skip the rest of the prediction because covariance won't change
+  if (dt < 0.000001) {
+    Xsig_pred_ = Xsig_aug.topRows(n_x_);
+    return;
+  }
 
   // Predict XsigPred
   double dt2 = dt * dt;
