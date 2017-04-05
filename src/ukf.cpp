@@ -212,15 +212,6 @@ void UKF::Predict(double dt) {
     P_ += weights_(i) * d * d.transpose();
   }
 
-  cout << "Predict(" << dt << ")" <<endl
-       << "X_aug:" << endl << x_aug <<endl
-       << "P_aug:" << endl << P_aug << endl
-       << "A:" << endl << A << endl
-       << "Xsig_aug:" << endl << Xsig_aug << endl
-       << "Xsig_pred:" << endl << Xsig_pred_  << endl
-       << "x:" << endl << x_ << endl
-       << "P:" << endl << P_ << endl;
-
   assert(x_.allFinite());
   assert(P_.allFinite());
   assert(P_.llt().info() != Eigen::NumericalIssue);
@@ -247,16 +238,6 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   // Calculate the NIS
   NIS_laser_ = y.transpose() * S_inv * y;
-
-  cout << "UpdateLidar(" << meas_package.raw_measurements_.transpose() << ")" << endl
-       << "y:" << endl << y << endl
-       << "H:" << endl << H_laser_ << endl
-       << "R:" << endl << R_laser_ << endl
-       << "S:" << endl << S << endl
-       << "K:" << endl << K << endl
-       << "KH:" << endl << K*H_laser_ << endl
-       << "x:" << endl << x_ << endl
-       << "P:" <<endl << P_ << endl;
 
   assert(x_.allFinite());
   assert(P_.allFinite());
@@ -326,17 +307,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   // Calculate the NIS
   NIS_radar_ = y.transpose() * S_inv * y;
-
-  cout << "Zsig:" << endl << Zsig <<endl
-       << "z_pred:" << endl << z_pred << endl
-       << "S:" << endl << S << endl
-       << "Tc:" << endl << Tc  << endl
-       << "S_inv:" << endl << S_inv << endl
-       << "K:" << endl << K << endl
-       << "z:" << endl << meas_package.raw_measurements_ << endl
-       << "y:" << endl << y << endl
-       << "x:" << endl << x_ << endl
-       << "P:" <<endl << P_ << endl;
 
   assert(x_.allFinite());
   assert(P_.allFinite());
