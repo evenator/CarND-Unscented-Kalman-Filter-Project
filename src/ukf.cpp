@@ -49,7 +49,7 @@ UKF::UKF():
 
   Xsig_pred_.fill(0);
 
-  P_ = MatrixXd::Identity(n_x_, n_x_) * 1000.0;
+  P_ = MatrixXd::Identity(n_x_, n_x_);
 
   H_laser_ << 1, 0, 0, 0, 0,
               0, 1, 0, 0, 0;
@@ -157,7 +157,7 @@ void UKF::Predict(double dt) {
   assert(P_aug.llt().info() != Eigen::NumericalIssue);
 
   // Create Xsig_aug Matrix
-  MatrixXd A = P_aug.ldlt().matrixL();
+  MatrixXd A = P_aug.llt().matrixL();
   A *= sqrt(lambda_ + n_aug_);
   MatrixXd Xsig_aug = x_aug.replicate(1, 2 * n_aug_ + 1);
   Xsig_aug.block(0, 1, n_aug_, n_aug_) += A;
