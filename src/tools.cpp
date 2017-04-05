@@ -13,6 +13,8 @@ VectorXd CalculateRMSE(const vector<VectorXd> &estimations,
   for (size_t i = 0; i < estimations.size(); ++i) {
     assert(estimations[i].size() == ground_truth[i].size());
     ArrayXd err = (estimations[i] - ground_truth[i]).array();
+    // Handle Angle Wrap
+    err(3) = atan2(sin(err(3)), cos(err(3)));
     sum_err2 += err * err;
   }
   return (sum_err2 / estimations.size()).sqrt().matrix();
