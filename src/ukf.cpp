@@ -1,4 +1,5 @@
 #include "ukf.h"
+#include <cassert>
 #include "Eigen/Dense"
 #include <iostream>
 
@@ -11,48 +12,47 @@ using std::vector;
  * Initializes Unscented Kalman filter
  */
 UKF::UKF():
-  is_initialized_(false),
-  // if this is false, laser measurements will be ignored (except during init)
-  use_laser_(true),
-  // if this is false, radar measurements will be ignored (except during init)
-  use_radar_(true),
-  // initial state vector
-  n_x_(5),
-  n_aug_(7),
-  x_(n_x_),
-  // initial covariance matrix
-  P_(n_x_, n_x_),
-  // initial Xsig_pred_
-  Xsig_pred_(n_x_, 2 * n_aug_ + 1),
-  // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_(9),  // TODO: Tune this
-  // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_(1),  // TODO: Tune this
-  // Laser measurement noise standard deviation position1 in m
-  std_laspx_(0.15),
-  // Laser measurement noise standard deviation position2 in m
-  std_laspy_(0.15),
-  // Radar measurement noise standard deviation radius in m
-  std_radr_(0.3),
-  // Radar measurement noise standard deviation angle in rad
-  std_radphi_(0.03),
-  // Radar measurement noise standard deviation radius change in m/s
-  std_radrd_(0.3),
-  // Lamda coefficient for unscented transform
-  lambda_(3),
-  H_laser_(2, 4),
-  R_laser_(2, 2){
+    is_initialized_(false),
+    // if this is false, laser measurements will be ignored (except during init)
+    use_laser_(true),
+    // if this is false, radar measurements will be ignored (except during init)
+    use_radar_(true),
+    // initial state vector
+    n_x_(5),
+    n_aug_(7),
+    x_(n_x_),
+    // initial covariance matrix
+    P_(n_x_, n_x_),
+    // initial Xsig_pred_
+    Xsig_pred_(n_x_, 2 * n_aug_ + 1),
+    // Process noise standard deviation longitudinal acceleration in m/s^2
+    std_a_(2.5),  // TODO: Tune this
+    // Process noise standard deviation yaw acceleration in rad/s^2
+    std_yawdd_(.5),  // TODO: Tune this
+    // Laser measurement noise standard deviation position1 in m
+    std_laspx_(0.15),
+    // Laser measurement noise standard deviation position2 in m
+    std_laspy_(0.15),
+    // Radar measurement noise standard deviation radius in m
+    std_radr_(0.3),
+    // Radar measurement noise standard deviation angle in rad
+    std_radphi_(0.03),
+    // Radar measurement noise standard deviation radius change in m/s
+    std_radrd_(0.3),
+    // Lamda coefficient for unscented transform
+    lambda_(3-n_aug_),
+    H_laser_(2, 5),
+    R_laser_(2, 2){
   weights_ = VectorXd::Constant(2*n_aug_+1, 0.5/(lambda_ + n_aug_));
   weights_(0) *= 2 * lambda_;
-
   x_.fill(0);
 
   Xsig_pred_.fill(0);
 
   P_ = MatrixXd::Identity(n_x_, n_x_) * 1000.0;
 
-  H_laser_ << 1, 0, 0, 0,
-              0, 1, 0, 0;
+  H_laser_ << 1, 0, 0, 0, 0,
+              0, 1, 0, 0, 0;
 
   R_laser_ << std_laspx_ * std_laspx_, 0,
               0, std_laspy_ * std_laspy_;
@@ -135,23 +135,34 @@ MatrixXd UKF::HInvjRadar(const Eigen::VectorXd &z_measurement) {
  * @param {double} delta_t the change in time (in seconds) between the last
  * measurement and this one.
  */
+
 void UKF::Predict(double dt) {
+  assert(x_.allFinite());
+  assert(P_.allFinite());
+  // P Matrix must be positive semi-definite
+  assert(P_.llt().info() != Eigen::NumericalIssue);
+
   // Create x_aug Vector
   VectorXd x_aug = VectorXd::Zero(n_aug_);
-  x_aug.topRows(n_x_) = x_;
+  x_aug.head(n_x_) = x_;
+  assert(x_aug.allFinite());
 
   // Create P_aug Matrix
   MatrixXd P_aug = MatrixXd::Zero(n_aug_, n_aug_);
   P_aug.topLeftCorner(n_x_, n_x_) = P_;
   P_aug(n_x_, n_x_) = std_a_ * std_a_;
   P_aug(n_x_ + 1, n_x_+1) = std_yawdd_ * std_yawdd_;
+  assert(P_aug.allFinite());
+  // P_aug Matrix must be positive semi-definite
+  assert(P_aug.llt().info() != Eigen::NumericalIssue);
   
   // Create Xsig_aug Matrix
-  MatrixXd A = P_aug.llt().matrixL();
-  A *= sqrt(lambda_ + n_x_);
+  MatrixXd A = P_aug.ldlt().matrixL();
+  A *= sqrt(lambda_ + n_aug_);
   MatrixXd Xsig_aug = x_aug.replicate(1, 2 * n_aug_ + 1);
   Xsig_aug.block(0, 1, n_aug_, n_aug_) += A;
   Xsig_aug.rightCols(n_aug_) -= A;
+  assert(Xsig_aug.allFinite());
 
   // Predict XsigPred
   double dt2 = dt * dt;
@@ -161,7 +172,7 @@ void UKF::Predict(double dt) {
     const double& psi_dot_k = Xsig_aug(4, i);
     const double& nu_a_k = Xsig_aug(5, i);
     const double& nu_psi_ddot_k = Xsig_aug(6, i);
-    Xsig_pred_.col(i) = Xsig_aug.col(i);
+    Xsig_pred_.col(i) = Xsig_aug.block(0, i, n_x_, 1);
     if (abs(psi_dot_k) < .000001) {
       Xsig_pred_(0, i) += (vk + .5 * dt * nu_a_k) * cos(psi_k) * dt;
       Xsig_pred_(1, i) += (vk + .5 * dt * nu_a_k) * sin(psi_k) * dt;
@@ -180,6 +191,7 @@ void UKF::Predict(double dt) {
       Xsig_pred_(4, i) += dt * nu_psi_ddot_k;
     }
   }
+  assert(Xsig_pred_.allFinite());
 
   // Calculate Updated State Vector x_
   x_ = Xsig_pred_ * weights_;
@@ -192,14 +204,19 @@ void UKF::Predict(double dt) {
     d(3) = atan2(sin(d(3)), cos(d(3)));
     P_ += weights_(i) * d * d.transpose();
   }
-  
+
   cout << "Predict(" << dt << ")" <<endl
        << "X_aug:" << endl << x_aug <<endl
        << "P_aug:" << endl << P_aug << endl
+       << "A:" << endl << A << endl
        << "Xsig_aug:" << endl << Xsig_aug << endl
        << "Xsig_pred:" << endl << Xsig_pred_  << endl
        << "x:" << endl << x_ << endl
        << "P:" << endl << P_ << endl;
+
+  assert(x_.allFinite());
+  assert(P_.allFinite());
+  assert(P_.llt().info() != Eigen::NumericalIssue);
 }
 
 /**
@@ -207,6 +224,11 @@ void UKF::Predict(double dt) {
  * @param {MeasurementPackage} meas_package
  */
 void UKF::UpdateLidar(MeasurementPackage meas_package) {
+  assert(x_.allFinite());
+  assert(P_.allFinite());
+  assert(meas_package.raw_measurements_.allFinite());
+  assert(meas_package.raw_measurements_.size() == 2);
+
   // This is a linear update
   VectorXd y = meas_package.raw_measurements_ - H_laser_ * x_;
   MatrixXd S = H_laser_ * P_ * H_laser_.transpose() + R_laser_;
