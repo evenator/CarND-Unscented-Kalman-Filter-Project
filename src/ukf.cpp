@@ -155,7 +155,7 @@ void UKF::Predict(double dt) {
   assert(P_aug.allFinite());
   // P_aug Matrix must be positive semi-definite
   assert(P_aug.llt().info() != Eigen::NumericalIssue);
-  
+
   // Create Xsig_aug Matrix
   MatrixXd A = P_aug.ldlt().matrixL();
   A *= sqrt(lambda_ + n_aug_);
@@ -237,18 +237,23 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   x_ = x_ + K * y;
   x_(3) = atan2(sin(x_(3)), cos(x_(3)));
   P_ = (MatrixXd::Identity(x_.size(), x_.size()) - K * H_laser_) * P_;
-  cout << endl
+
+  // Calculate the NIS
+  NIS_laser_ = y.transpose() * S_inv * y;
+
+  cout << "UpdateLidar(" << meas_package.raw_measurements_.transpose() << ")" << endl
        << "y:" << endl << y << endl
        << "H:" << endl << H_laser_ << endl
        << "R:" << endl << R_laser_ << endl
        << "S:" << endl << S << endl
        << "K:" << endl << K << endl
        << "KH:" << endl << K*H_laser_ << endl
-       << "X:" << endl << x_ << endl
-       << "P:" << endl << P_ << endl
-       << endl;
-  // Calculate the NIS
-  NIS_laser_ = y.transpose() * S_inv * y;
+       << "x:" << endl << x_ << endl
+       << "P:" <<endl << P_ << endl;
+
+  assert(x_.allFinite());
+  assert(P_.allFinite());
+  assert(P_.llt().info() != Eigen::NumericalIssue);
 }
 
 /**
@@ -256,6 +261,11 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
  * @param {MeasurementPackage} meas_package
  */
 void UKF::UpdateRadar(MeasurementPackage meas_package) {
+  assert(x_.allFinite());
+  assert(P_.allFinite());
+  assert(meas_package.raw_measurements_.allFinite());
+  assert(meas_package.raw_measurements_.size() == 3);
+
   const int n_z = meas_package.raw_measurements_.size();
 
   // Calculate the Z_sig Matrix
@@ -279,12 +289,11 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   // Calculate Predicted Measurement Vector
   VectorXd z_pred = Zsig * weights_;
   z_pred(1) = atan2(sin(z_pred(1)), cos(z_pred(1)));
-  
+
   // Calculate Measurement Covariance Matrix S and Cross Correlation Matrix Tc
   MatrixXd S = MatrixXd::Zero(n_z, n_z);
   MatrixXd Tc = MatrixXd::Zero(n_x_, n_z);
-  for (int i = 0; i < Zsig.cols(); ++i)
-  {
+  for (int i = 0; i < Zsig.cols(); ++i) {
       VectorXd dZ = Zsig.col(i) - z_pred;
       dZ(1) = atan2(sin(dZ(1)), cos(dZ(1)));
       S += weights_(i) * dZ * dZ.transpose();
@@ -307,10 +316,10 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   x_ += K * y;
   x_(3) = atan2(sin(x_(3)), cos(x_(3)));
   P_ -= K * S * K.transpose();
-  
+
   // Calculate the NIS
   NIS_radar_ = y.transpose() * S_inv * y;
-  
+
   cout << "Zsig:" << endl << Zsig <<endl
        << "z_pred:" << endl << z_pred << endl
        << "S:" << endl << S << endl
@@ -321,4 +330,8 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
        << "y:" << endl << y << endl
        << "x:" << endl << x_ << endl
        << "P:" <<endl << P_ << endl;
+
+  assert(x_.allFinite());
+  assert(P_.allFinite());
+  assert(P_.llt().info() != Eigen::NumericalIssue);
 }
