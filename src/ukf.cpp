@@ -26,9 +26,9 @@ UKF::UKF():
     // initial Xsig_pred_
     Xsig_pred_(n_x_, 2 * n_aug_ + 1),
     // Process noise standard deviation longitudinal acceleration in m/s^2
-    std_a_(2.5),  // TODO: Tune this
+    std_a_(0.8),
     // Process noise standard deviation yaw acceleration in rad/s^2
-    std_yawdd_(.5),  // TODO: Tune this
+    std_yawdd_(0.55),  // TODO: Tune this
     // Laser measurement noise standard deviation position1 in m
     std_laspx_(0.15),
     // Laser measurement noise standard deviation position2 in m
